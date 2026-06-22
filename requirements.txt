@@ -1,6 +1,5 @@
 streamlit
 groq
-openai-whisper
 torch
 python-dotenv
 ffmpeg-python
