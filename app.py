@@ -43,52 +43,86 @@ st.set_page_config(
 st.markdown("""
 <style>
 
-.stApp {
-    background-color: #0f172a;
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+.stApp{
+    background:#FDF6FF;
 }
 
-.hero {
-    background: linear-gradient(135deg,#4f46e5,#7c3aed);
-    padding: 2rem;
-    border-radius: 20px;
-    text-align: center;
-    color: white;
-    margin-bottom: 2rem;
+html, body, [class*="css"]{
+    font-family:'Press Start 2P', cursive;
 }
 
-.card {
-    background: rgba(255,255,255,0.05);
-    padding: 1.2rem;
-    border-radius: 18px;
-    border: 1px solid rgba(255,255,255,0.1);
-    backdrop-filter: blur(12px);
-}
-
-.metric-card {
-    background: rgba(255,255,255,0.05);
-    padding: 15px;
-    border-radius: 15px;
-    text-align: center;
-}
-
-.footer {
+.hero{
+    background:#CDB4FF;
+    border:4px solid black;
+    padding:30px;
     text-align:center;
-    color:#94a3b8;
-    padding:20px;
-    margin-top:20px;
+    box-shadow:8px 8px 0px black;
+    margin-bottom:25px;
 }
 
-.stButton > button {
+.hero h1{
+    color:#3D2C5A;
+    font-size:30px;
+}
+
+.hero p{
+    color:#4B3F72;
+    font-size:11px;
+}
+
+section[data-testid="stSidebar"]{
+    background:#FFE5EC;
+}
+
+.stButton > button{
     width:100%;
-    height:55px;
-    border-radius:12px;
+    height:60px;
+    background:#FFAFCC;
+    color:black;
+    border:3px solid black;
+    border-radius:0px;
+    box-shadow:5px 5px 0px black;
     font-weight:bold;
-    background:#6366f1;
-    color:white;
 }
 
-.stDownloadButton > button {
+.stButton > button:hover{
+    transform:translate(2px,2px);
+    box-shadow:3px 3px 0px black;
+}
+
+.stDownloadButton > button{
     width:100%;
+    background:#BDE0FE;
+    color:black;
+    border:3px solid black;
+    border-radius:0px;
+    box-shadow:4px 4px 0px black;
+}
+
+[data-testid="stMetric"]{
+    background:white;
+    border:3px solid black;
+    padding:12px;
+    box-shadow:4px 4px 0px black;
+}
+
+textarea{
+    border:3px solid black !important;
+}
+
+.stTextArea textarea{
+    background:white !important;
+    color:black !important;
+}
+
+.footer{
+    text-align:center;
+    color:#666;
+    padding:20px;
+    margin-top:30px;
+    font-size:10px;
 }
 
 </style>
@@ -329,7 +363,7 @@ if st.session_state.transcript:
 else:
 
     st.info(
-        "👆 Upload an audio file to get started."
+        "Upload an audio file to get started."
     )
 
 st.markdown(
