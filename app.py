@@ -2,7 +2,6 @@ import os
 import tempfile
 
 import streamlit as st
-import whisper
 
 from groq import Groq
 from dotenv import load_dotenv
@@ -11,9 +10,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GROQ_API_KEY   = os.getenv("GROQ_API_KEY")
-WHISPER_MODEL  = "base"
-GROQ_MODEL     = "llama3-8b-8192"
-SUPPORTED_EXTS = ["wav", "mp3", "m4a"]
+WHISPER_MODEL  = "whisper-large-v3"
+GROQ_MODEL     = "llama-3.1-8b-instant"
+SUPPORTED_EXTS = ["wav", "mp3", "m4a", "webm"]
 
 SUMMARY_PROMPT = """You are an expert note-taking assistant.
 
@@ -47,11 +46,6 @@ st.title("🎙️ AI Notes Summarizer")
 st.caption("Upload a recording → get a transcript + structured notes in seconds.")
 
 
-@st.cache_resource(show_spinner="Loading speech model…")
-def load_whisper():
-    return whisper.load_model(WHISPER_MODEL)
-
-
 def get_groq_client() -> Groq | None:
     if not GROQ_API_KEY:
         st.error(
@@ -63,10 +57,14 @@ def get_groq_client() -> Groq | None:
     return Groq(api_key=GROQ_API_KEY)
 
 
-def transcribe(audio_path: str) -> str:
-    model = load_whisper()
-    result = model.transcribe(audio_path)
-    return result["text"].strip()
+def transcribe(audio_path: str, client: Groq) -> str:
+    with open(audio_path, "rb") as f:
+        response = client.audio.transcriptions.create(
+            model=WHISPER_MODEL,
+            file=f,
+            response_format="text",
+        )
+    return response.strip() if isinstance(response, str) else response.text.strip()
 
 
 def summarize(transcript: str, client: Groq) -> str:
@@ -110,7 +108,7 @@ with st.sidebar:
     st.divider()
     st.markdown(
         f"**Models**  \n"
-        f"- Speech: `openai/whisper-{WHISPER_MODEL}`  \n"
+        f"- Speech: `{WHISPER_MODEL}`  \n"
         f"- Summary: `{GROQ_MODEL}`"
     )
 
@@ -141,7 +139,7 @@ if uploaded_file:
             try:
                 with st.status("Transcribing audio…", expanded=True) as status:
                     st.write("Running Whisper on your file…")
-                    transcript = transcribe(tmp_path)
+                    transcript = transcribe(tmp_path, client)
                     word_count = len(transcript.split())
                     st.write(f"✓ Transcribed **{word_count:,} words**")
 
