@@ -1,17 +1,14 @@
 import os
 import tempfile
-
 import streamlit as st
-
 from groq import Groq
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
-GROQ_API_KEY   = os.getenv("GROQ_API_KEY")
-WHISPER_MODEL  = "whisper-large-v3"
-GROQ_MODEL     = "llama-3.1-8b-instant"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+WHISPER_MODEL = "whisper-large-v3"
+GROQ_MODEL = "llama-3.1-8b-instant"
 SUPPORTED_EXTS = ["wav", "mp3", "m4a", "webm"]
 
 SUMMARY_PROMPT = """You are an expert note-taking assistant.
@@ -30,171 +27,317 @@ Respond ONLY in this exact format (keep section headings):
 - <point>
 
 ## Action Items
-- <action item> (write "None identified" if there are none)
+- <action item>
 
 ## Summary
-<2-3 sentence paragraph>"""
-
+<2-3 sentence paragraph>
+"""
 
 st.set_page_config(
     page_title="AI Notes Summarizer",
     page_icon="🎙️",
     layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-st.title("🎙️ AI Notes Summarizer")
-st.caption("Upload a recording → get a transcript + structured notes in seconds.")
+st.markdown("""
+<style>
 
+.stApp {
+    background-color: #0f172a;
+}
 
-def get_groq_client() -> Groq | None:
-    if not GROQ_API_KEY:
-        st.error(
-            "⚠️ **GROQ_API_KEY not found.** "
-            "Add it to your `.env` file and restart the app.",
-            icon="🔑",
-        )
-        return None
-    return Groq(api_key=GROQ_API_KEY)
+.hero {
+    background: linear-gradient(135deg,#4f46e5,#7c3aed);
+    padding: 2rem;
+    border-radius: 20px;
+    text-align: center;
+    color: white;
+    margin-bottom: 2rem;
+}
 
+.card {
+    background: rgba(255,255,255,0.05);
+    padding: 1.2rem;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.1);
+    backdrop-filter: blur(12px);
+}
 
-def transcribe(audio_path: str, client: Groq) -> str:
-    with open(audio_path, "rb") as f:
-        response = client.audio.transcriptions.create(
-            model=WHISPER_MODEL,
-            file=f,
-            response_format="text",
-        )
-    return response.strip() if isinstance(response, str) else response.text.strip()
+.metric-card {
+    background: rgba(255,255,255,0.05);
+    padding: 15px;
+    border-radius: 15px;
+    text-align: center;
+}
 
+.footer {
+    text-align:center;
+    color:#94a3b8;
+    padding:20px;
+    margin-top:20px;
+}
 
-def summarize(transcript: str, client: Groq) -> str:
-    response = client.chat.completions.create(
-        model=GROQ_MODEL,
-        messages=[{"role": "user", "content": SUMMARY_PROMPT.format(transcript=transcript)}],
-        temperature=0.3,
-    )
-    return response.choices[0].message.content.strip()
+.stButton > button {
+    width:100%;
+    height:55px;
+    border-radius:12px;
+    font-weight:bold;
+    background:#6366f1;
+    color:white;
+}
 
+.stDownloadButton > button {
+    width:100%;
+}
 
-def save_upload_to_temp(uploaded_file) -> str:
-    suffix = os.path.splitext(uploaded_file.name)[-1] or ".wav"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(uploaded_file.read())
-        return tmp.name
+</style>
+""", unsafe_allow_html=True)
 
-
-def human_size(n_bytes: int) -> str:
-    for unit in ("B", "KB", "MB"):
-        if n_bytes < 1024:
-            return f"{n_bytes:.1f} {unit}"
-        n_bytes /= 1024
-    return f"{n_bytes:.1f} GB"
-
+st.markdown("""
+<div class="hero">
+<h1>🎙 AI Notes Summarizer</h1>
+<p>Convert meetings, lectures, and voice recordings into structured notes instantly</p>
+</div>
+""", unsafe_allow_html=True)
 
 for key in ("transcript", "summary", "processed_name"):
     st.session_state.setdefault(key, None)
 
 
-with st.sidebar:
-    st.header("How it works")
-    st.markdown(
-        """
-        1. 🎙️ Upload a **WAV / MP3 / M4A** file  
-        2. 🔍 Whisper transcribes the speech  
-        3. 🤖 Groq (LLaMA 3) structures the notes  
-        4. 📋 Copy or download your summary  
-        """
-    )
-    st.divider()
-    st.markdown(
-        f"**Models**  \n"
-        f"- Speech: `{WHISPER_MODEL}`  \n"
-        f"- Summary: `{GROQ_MODEL}`"
+def get_groq_client():
+    if not GROQ_API_KEY:
+        st.error("GROQ_API_KEY missing.")
+        return None
+    return Groq(api_key=GROQ_API_KEY)
+
+
+def save_upload_to_temp(uploaded_file):
+    suffix = os.path.splitext(uploaded_file.name)[-1]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(uploaded_file.read())
+        return tmp.name
+
+
+def transcribe(audio_path, client):
+    with open(audio_path, "rb") as f:
+        response = client.audio.transcriptions.create(
+            model=WHISPER_MODEL,
+            file=f,
+            response_format="text"
+        )
+
+    return response.strip() if isinstance(response, str) else response.text.strip()
+
+
+def summarize(transcript, client):
+    response = client.chat.completions.create(
+        model=GROQ_MODEL,
+        messages=[
+            {
+                "role": "user",
+                "content": SUMMARY_PROMPT.format(
+                    transcript=transcript
+                )
+            }
+        ],
+        temperature=0.3
     )
 
+    return response.choices[0].message.content
+
+
+def human_size(size):
+    for unit in ["B","KB","MB","GB"]:
+        if size < 1024:
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} TB"
+
+
+with st.sidebar:
+
+    st.title("⚙ Settings")
+
+    st.markdown("---")
+
+    st.markdown("### AI Models")
+
+    st.success(f"Speech: {WHISPER_MODEL}")
+
+    st.success(f"Summary: {GROQ_MODEL}")
+
+    st.markdown("---")
+
+    st.markdown(
+        """
+### Workflow
+
+1️⃣ Upload Audio
+
+2️⃣ Speech → Text
+
+3️⃣ AI Summarization
+
+4️⃣ Download Notes
+"""
+    )
+
+    st.markdown("---")
+
+    st.info(
+        "Supports lectures, meetings, interviews, podcasts, and voice memos."
+    )
+
+st.markdown("### 📤 Upload Audio")
 
 uploaded_file = st.file_uploader(
-    "Upload your audio file",
-    type=SUPPORTED_EXTS,
-    help="Supports WAV, MP3, and M4A up to ~25 MB.",
+    "",
+    type=SUPPORTED_EXTS
 )
 
 if uploaded_file:
+
     file_size = len(uploaded_file.getvalue())
-    col_info1, col_info2, col_info3 = st.columns(3)
-    col_info1.metric("File", uploaded_file.name)
-    col_info2.metric("Size", human_size(file_size))
-    col_info3.metric("Format", uploaded_file.type or uploaded_file.name.split(".")[-1].upper())
+
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric("File Name", uploaded_file.name)
+
+    c2.metric("File Size", human_size(file_size))
+
+    c3.metric("Format", uploaded_file.name.split(".")[-1].upper())
 
     st.audio(uploaded_file)
 
-    already_done = st.session_state.processed_name == uploaded_file.name
-    btn_label = "✅ Re-generate Notes" if already_done else "⚡ Generate Notes"
-    run = st.button(btn_label, type="primary", use_container_width=True)
+    if st.button(
+        "⚡ Generate Notes",
+        use_container_width=True
+    ):
 
-    if run:
         client = get_groq_client()
+
         if client:
-            tmp_path = save_upload_to_temp(uploaded_file)
+
+            temp_path = save_upload_to_temp(
+                uploaded_file
+            )
+
             try:
-                with st.status("Transcribing audio…", expanded=True) as status:
-                    st.write("Running Whisper on your file…")
-                    transcript = transcribe(tmp_path, client)
-                    word_count = len(transcript.split())
-                    st.write(f"✓ Transcribed **{word_count:,} words**")
 
-                    status.update(label="Generating notes…")
-                    st.write("Sending transcript to Groq…")
-                    summary = summarize(transcript, client)
-                    st.write("✓ Notes ready")
+                with st.spinner(
+                    "🎧 Transcribing audio..."
+                ):
 
-                    status.update(label="Done!", state="complete", expanded=False)
+                    transcript = transcribe(
+                        temp_path,
+                        client
+                    )
 
-                st.session_state.transcript     = transcript
-                st.session_state.summary        = summary
+                with st.spinner(
+                    "🤖 Generating notes..."
+                ):
+
+                    summary = summarize(
+                        transcript,
+                        client
+                    )
+
+                st.session_state.transcript = transcript
+                st.session_state.summary = summary
                 st.session_state.processed_name = uploaded_file.name
 
-            except Exception as exc:
-                st.error(f"Something went wrong: {exc}", icon="❌")
-            finally:
-                os.unlink(tmp_path)
+                st.success(
+                    "Notes generated successfully!"
+                )
 
+            except Exception as e:
+
+                st.error(str(e))
+
+            finally:
+
+                os.unlink(temp_path)
 
 if st.session_state.transcript:
-    st.divider()
-    left, right = st.columns(2, gap="large")
+
+    st.markdown("---")
+
+    transcript_words = len(
+        st.session_state.transcript.split()
+    )
+
+    m1, m2, m3 = st.columns(3)
+
+    m1.metric(
+        "Words",
+        f"{transcript_words:,}"
+    )
+
+    m2.metric(
+        "Characters",
+        f"{len(st.session_state.transcript):,}"
+    )
+
+    m3.metric(
+        "Status",
+        "Completed"
+    )
+
+    st.markdown("---")
+
+    left, right = st.columns(2)
 
     with left:
-        st.subheader("📝 Transcript")
-        st.text_area(
-            label="transcript_area",
-            label_visibility="collapsed",
-            value=st.session_state.transcript,
-            height=420,
+
+        st.markdown(
+            "## 📜 Transcript"
         )
+
+        st.text_area(
+            "",
+            st.session_state.transcript,
+            height=500
+        )
+
         st.download_button(
-            "⬇️ Download transcript",
-            data=st.session_state.transcript,
-            file_name="transcript.txt",
-            mime="text/plain",
-            use_container_width=True,
+            "⬇ Download Transcript",
+            st.session_state.transcript,
+            "transcript.txt",
+            "text/plain",
+            use_container_width=True
         )
 
     with right:
-        st.subheader("🗒️ Generated Notes")
-        st.markdown(st.session_state.summary)
-        st.divider()
-        st.download_button(
-            "⬇️ Download notes",
-            data=st.session_state.summary,
-            file_name="notes_summary.txt",
-            mime="text/plain",
-            use_container_width=True,
+
+        st.markdown(
+            "## 📝 Generated Notes"
         )
 
-elif not uploaded_file:
+        st.markdown(
+            st.session_state.summary
+        )
+
+        st.download_button(
+            "⬇ Download Notes",
+            st.session_state.summary,
+            "notes_summary.txt",
+            "text/plain",
+            use_container_width=True
+        )
+
+else:
+
     st.info(
-        "👆 Upload an audio file above to get started. "
-        "Lectures, meetings, voice memos — anything works.",
-        icon="💡",
+        "👆 Upload an audio file to get started."
     )
+
+st.markdown(
+    """
+<div class="footer">
+Built with ❤️ using Streamlit + Groq + Whisper
+</div>
+""",
+unsafe_allow_html=True
+)
+
